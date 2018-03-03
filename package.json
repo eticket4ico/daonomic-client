@@ -8,8 +8,7 @@
     "npm": "^5.5.1"
   },
   "scripts": {
-    "start":
-      "cross-env NODE_ENV=development API=development DEBUG_ENABLED=true webpack-dev-server",
+    "start": "cross-env NODE_ENV=development API=development DEBUG_ENABLED=true webpack-dev-server",
     "storybook": "NODE_ENV=development start-storybook -p 9001",
     "prebuild": "rm -rf ./build && mkdir ./build && npm run build:copy-assets",
     "build": "cross-env NODE_ENV=production webpack",
@@ -19,14 +18,16 @@
     "lint": "eslint source webpack",
     "flow": "flow",
     "qa": "npm run lint && npm run test && npm run flow",
-    "ensure-git-credentials":
-      "git config --local user.name \"Dev\" && git config --local user.email \"dev@0v1se.com\"",
+    "ensure-git-credentials": "git config --local user.name \"Dev\" && git config --local user.email \"dev@0v1se.com\"",
     "postinstall": "npm run ensure-git-credentials",
     "precommit": "npm run ensure-git-credentials && lint-staged && npm run qa",
     "format": "prettier --write \"./source/**/*.{js,css,json,md}\""
   },
   "lint-staged": {
-    "*.{js,json,md,css}": ["prettier --write", "git add"]
+    "*.{js,json,md,css}": [
+      "prettier --write",
+      "git add"
+    ]
   },
   "author": "Dev dev@0v1se.com",
   "license": "GPL-3.0",
