@@ -1,5 +1,5 @@
 import { when, reaction } from 'mobx';
-import api from '~/api/api.mock';
+import api from '~/api/mock';
 import { AuthStore } from '~/stores/auth';
 import { KycStore } from '~/stores/kyc';
 import { WalletBalanceStore } from './';
@@ -25,7 +25,7 @@ describe('wallet balance store', () => {
     kyc.saveData();
 
     when(
-      () => kyc.isSaved && walletBalance.isLoading,
+      () => kyc.isAllowed && walletBalance.isLoading,
       () => {
         when(
           () => walletBalance.isLoaded,
@@ -63,7 +63,7 @@ describe('wallet balance store', () => {
     when(() => walletBalance.isLoaded && balanceUpdatesCount === 3, done);
   });
 
-  test('should cancel loading and reset balance if saved kyc address has been reset', (done) => {
+  test('should cancel loading and reset balance if kyc is not allowed anymore', (done) => {
     jest.useFakeTimers();
 
     const auth = new AuthStore({ api });
@@ -88,7 +88,48 @@ describe('wallet balance store', () => {
     when(
       () => walletBalance.isLoaded && balanceUpdatesCount === 3,
       () => {
-        kyc.updateFormField('address', '');
+        kyc.reset();
+
+        when(
+          () => !walletBalance.isLoaded && walletBalance.balance === 0,
+          () => {
+            expect(balanceUpdatesCount).toBe(4);
+            done();
+          },
+        );
+      },
+    );
+  });
+
+  test('should cancel loading and reset balance if user logs out', (done) => {
+    jest.useFakeTimers();
+
+    const auth = new AuthStore({ api });
+
+    auth.setToken('test token');
+
+    const kyc = new KycStore({ api, auth });
+    const walletBalance = new WalletBalanceStore({ api, kyc });
+
+    kyc.updateFormField('address', 'test address');
+    kyc.saveData();
+
+    let balanceUpdatesCount = 0;
+
+    reaction(
+      () => walletBalance.isLoaded,
+      (isLoaded) => {
+        if (isLoaded) {
+          balanceUpdatesCount += 1;
+          jest.runOnlyPendingTimers();
+        }
+      },
+    );
+
+    when(
+      () => walletBalance.isLoaded && balanceUpdatesCount === 3,
+      () => {
+        auth.logout();
 
         when(
           () => !walletBalance.isLoaded && walletBalance.balance === 0,

@@ -6,10 +6,10 @@ import {
   autorun,
   runInAction,
 } from 'mobx';
-import api from '~/api/api';
+import api from '~/api';
 import dataStates from '~/utils/data-states';
 import generateQRCode from '~/utils/generate-qrcode';
-import { sale } from '~/config/common';
+import { sale } from '~/config';
 import auth from '~/stores/auth';
 import kyc from '~/stores/kyc';
 
@@ -76,25 +76,22 @@ export class PaymentStore {
     });
 
     // Clear loaded payment addresses on kyc change
-    reaction(
-      () => !this.kyc.isSaved,
-      (shouldRun) => {
-        if (shouldRun) {
-          this.addressesByMethodId.clear();
-          this.paymentsByMethodId.clear();
-        }
-      },
-    );
+    autorun(() => {
+      if (!this.kyc.isAllowed) {
+        this.addressesByMethodId.clear();
+        this.paymentsByMethodId.clear();
+      }
+    });
 
     // Load and set payment method address on selected method change or kyc change
     reaction(
-      () => this.isLoaded && this.kyc.isSaved && this.selectedMethodId,
+      () => this.isLoaded && this.kyc.isAllowed && this.selectedMethodId,
       () => {
         const { id, token } = this.selectedMethod;
 
         if (
           !this.isLoaded ||
-          !this.kyc.isSaved ||
+          !this.kyc.isAllowed ||
           this.addressesByMethodId.get(id)
         ) {
           return;
@@ -115,16 +112,22 @@ export class PaymentStore {
 
     let issueRequestStatusIntervalId = null;
 
-    reaction(
-      () => this.selectedMethodAddress && this.auth.isAuthenticated,
-      (shouldRun) => {
+    autorun(() => {
+      if (!this.auth.isAuthenticated) {
         clearInterval(issueRequestStatusIntervalId);
-        const { selectedMethod } = this;
+      }
+    });
 
-        if (!shouldRun) {
+    reaction(
+      () => this.selectedMethodAddress,
+      (address) => {
+        clearInterval(issueRequestStatusIntervalId);
+
+        if (!address) {
           return;
         }
 
+        const { selectedMethod } = this;
         const updateIssueRequestStatus = () =>
           this.api
             .getPaymentStatus({

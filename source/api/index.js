@@ -1,16 +1,18 @@
 // @flow
 import axios from 'axios';
-import { sale, realm } from '~/config/common';
+import { sale, realm } from '~/config';
 import auth from '~/stores/auth';
 import cacheResult from '~/utils/cache-result';
 import type {
-  GetKycDataResponse,
+  GetKycAddressAndStatusResponse,
+  SetKycAddressParams,
+  GetKycUserDataResponse,
   SetKycDataParams,
   SetKycDataResponse,
-  SetKycDataResponseError,
+  KycValidationErrorResponse,
 } from '~/types/kyc';
 import type { AuthParams, PasswordRecoveryParams } from '~/types/auth';
-import { PaymentParams } from './types';
+import type { ApiShape, ResponsePromise } from './types';
 
 const defaultOptions = {
   get headers() {
@@ -28,11 +30,7 @@ const daonomicApi = axios.create({
   baseURL: baseApiUrl,
 });
 
-const clientApi = axios.create({
-  baseURL: process.env.CLIENT_API,
-});
-
-export default {
+const api: ApiShape = {
   auth: {
     login: ({ email, password }: AuthParams) =>
       daonomicApi.post('/login', { username: email, password }, defaultOptions),
@@ -54,32 +52,47 @@ export default {
         defaultOptions,
       ),
   },
+
   kycData: {
-    get: () => daonomicApi.get(`/sales/${sale}/address`, defaultOptions),
-    set: ({ address }: { address: string }) =>
+    getAddressAndStatus: (): ResponsePromise<GetKycAddressAndStatusResponse> =>
+      daonomicApi.get(`/sales/${sale}/address`, defaultOptions),
+    setAddress: ({
+      address,
+    }: SetKycAddressParams): ResponsePromise<GetKycAddressAndStatusResponse> =>
       daonomicApi.post(`/sales/${sale}/address`, { address }, defaultOptions),
-    getClient: (): Promise<GetKycDataResponse> =>
-      clientApi
-        .get(`/users/${localStorage.getItem('id') || ''}`)
-        .catch(() => ({ data: {} })),
-    setClient: (
+    getUserData: ({
+      baseUrl,
+    }: {
+      baseUrl: string,
+    }): ResponsePromise<GetKycUserDataResponse> =>
+      axios.get(`${baseUrl}/users/${auth.id}`).catch(() => ({ data: {} })),
+    setUserData: ({
+      baseUrl,
+      data,
+    }: {
+      baseUrl: string,
       data: SetKycDataParams,
-    ): Promise<SetKycDataResponse | SetKycDataResponseError> =>
-      clientApi.post(`/users/${localStorage.getItem('id') || ''}`, data),
+    }):
+      | ResponsePromise<SetKycDataResponse>
+      | Promise<KycValidationErrorResponse> =>
+      axios.post(`${baseUrl}/users/${auth.id}`, data),
   },
+
   getIcoInfo: cacheResult(
     () => daonomicApi.get(`/sales/${sale}`, defaultOptions),
     5000,
   ),
-  getPaymentAddress: ({ saleId, tokenId }: PaymentParams) =>
+  getPaymentAddress: ({ saleId, tokenId }) =>
     daonomicApi.get(
       `/sales/${saleId}/payment/${tokenId}/address`,
       defaultOptions,
     ),
-  getPaymentStatus: ({ saleId, tokenId }: PaymentParams) =>
+  getPaymentStatus: ({ saleId, tokenId }) =>
     daonomicApi.get(
       `/sales/${saleId}/payment/${tokenId}/status`,
       defaultOptions,
     ),
   getBalance: () => daonomicApi.get(`/sales/${sale}/balance`, defaultOptions),
 };
+
+export default api;
